@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Forge·Log</title>
+<style>
+  /* ---- Design tokens -----------------------------------------------------
+     Bright, clean "health app" surface: cool off-white background, white
+     cards with soft shadows, deep-slate ink, and a single energetic coral
+     accent for actions and the weight trend. Emerald appears only for the
+     reps trend and positive numbers. Numbers are tabular so data reads like
+     a dashboard. System fonts by design — the app must work fully offline. */
+  :root{
+    --bg:#eef1f5;
+    --card:#ffffff;
+    --ink:#14202b;
+    --ink-2:#5b6b78;
+    --ink-3:#93a1ac;
+    --line:#e5eaef;
+    --line-2:#eef2f6;
+    --accent:#ff5436;        /* coral — primary action / weight */
+    --accent-press:#e8431f;
+    --accent-tint:#fff0ec;
+    --teal:#0fb28f;          /* reps / positive */
+    --teal-tint:#e6f7f2;
+    --shadow-sm:0 1px 2px rgba(20,32,43,.05);
+    --shadow:0 1px 3px rgba(20,32,43,.06), 0 6px 20px rgba(20,32,43,.06);
+    --radius:16px;
+    --tap:50px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+    padding-bottom:calc(76px + env(safe-area-inset-bottom));
+    overscroll-behavior-y:contain;
+  }
+  .mono{font-variant-numeric:tabular-nums;
+    font-family:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace}
+
+  /* ---- App bar --------------------------------------------------------- */
+  header{
+    position:sticky;top:0;z-index:20;background:rgba(255,255,255,.86);
+    backdrop-filter:saturate(1.2) blur(10px);-webkit-backdrop-filter:saturate(1.2) blur(10px);
+    border-bottom:1px solid var(--line);
+    padding:calc(12px + env(safe-area-inset-top)) 18px 12px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  header .logo{font-weight:800;letter-spacing:.02em;font-size:17px;display:flex;align-items:center;gap:2px}
+  header .logo .dot{color:var(--accent);font-size:20px;line-height:0;transform:translateY(1px)}
+  header .logo .g{color:var(--ink)} header .logo .l{color:var(--ink-2);font-weight:700}
+  header .flame{width:20px;height:20px;margin-right:7px}
+
+  main{padding:14px 16px 28px;max-width:660px;margin:0 auto}
+  h2.screen{font-size:22px;margin:2px 2px 14px;font-weight:800;letter-spacing:-.01em}
+
+  /* ---- Setup card (date + plan) --------------------------------------- */
+  .setup{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:12px;margin-bottom:14px;display:flex;gap:10px}
+  .setup .fld{flex:1;min-width:0}
+  .setup label{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);font-weight:700;margin:2px 4px 6px}
+  .setup input[type=date],.setup select{
+    width:100%;height:46px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    border-radius:12px;padding:0 12px;font-size:16px;font-weight:600;-webkit-appearance:none;appearance:none}
+  .setup select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235b6b78' stroke-width='1.6' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
+  .setup input[type=date]{position:relative}
+
+  /* ---- Stat strip ------------------------------------------------------ */
+  .stats{display:flex;gap:10px;margin-bottom:18px}
+  .stat{flex:1;background:var(--card);border-radius:14px;box-shadow:var(--shadow-sm);
+    padding:12px 10px;text-align:center}
+  .stat .v{font-size:24px;font-weight:800;line-height:1.05;letter-spacing:-.02em}
+  .stat .v.coral{color:var(--accent)} .stat .v.teal{color:var(--teal)}
+  .stat .k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
+    font-weight:700;margin-top:5px}
+
+  /* ---- Super set + exercise cards -------------------------------------- */
+  .ss-title{display:flex;align-items:center;gap:10px;margin:22px 4px 10px}
+  .ss-title .bar{width:4px;height:16px;border-radius:2px;background:var(--accent)}
+  .ss-title span{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);font-weight:800}
+
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:15px;margin-bottom:12px}
+  .ex-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .ex-name{font-size:18px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+  .ex-last{font-size:12.5px;color:var(--ink-3);margin-top:4px}
+  .ex-last b{color:var(--ink-2);font-weight:700}
+  .count{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    width:54px;height:54px;border-radius:14px;background:var(--accent-tint)}
+  .count .n{font-size:24px;font-weight:800;line-height:1;color:var(--accent)}
+  .count .l{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
+    opacity:.75;font-weight:800;margin-top:2px}
+
+  .entry{display:flex;flex-direction:column;gap:11px;margin-top:14px}
+  .fields{display:flex;gap:11px}
+  .field{flex:1;min-width:0;background:var(--line-2);border-radius:13px;padding:8px 10px 10px}
+  .field .lab{display:block;text-align:center;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-3);font-weight:700;margin-bottom:5px}
+  .stepper{display:flex;align-items:center;gap:4px}
+  .stepper button{width:36px;height:38px;flex:none;border:none;border-radius:10px;background:#fff;
+    box-shadow:var(--shadow-sm);color:var(--ink);font-size:22px;line-height:1;font-weight:600}
+  .stepper button:active{background:var(--accent);color:#fff}
+  .stepper input{flex:1;min-width:0;width:100%;text-align:center;background:transparent;border:none;
+    color:var(--ink);font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+  .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .stepper input:focus{outline:none}
+  .logbtn{width:100%;height:52px;border:none;border-radius:13px;font-weight:800;font-size:15px;
+    letter-spacing:.08em;color:#fff;background:var(--accent);box-shadow:0 3px 12px rgba(255,84,54,.35)}
+  .logbtn:active{background:var(--accent-press)}
+
+  .sets{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+  .sets:empty{display:none}
+  .chip{background:var(--line-2);border-radius:999px;padding:6px 8px 6px 12px;font-size:13.5px;
+    display:flex;align-items:center;gap:8px;font-weight:600}
+  .chip b{color:var(--accent);font-weight:800} .chip .r{color:var(--ink-2)}
+  .chip .x{color:var(--ink-3);font-size:17px;line-height:1;padding:0 3px;font-weight:700}
+  .chip .x:active{color:var(--accent)}
+
+  /* ---- History --------------------------------------------------------- */
+  select.picker{width:100%;height:var(--tap);background:var(--card);color:var(--ink);
+    border:1px solid var(--line);border-radius:13px;padding:0 16px;font-size:16px;font-weight:600;
+    margin-bottom:14px;box-shadow:var(--shadow-sm);-webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235b6b78' stroke-width='1.6' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 16px center;padding-right:38px}
+  .chartcard{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:16px 14px 10px;margin-bottom:12px}
+  .chartcard .row{display:flex;justify-content:space-between;align-items:baseline}
+  .chartcard h4{margin:0;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);font-weight:800}
+  .chartcard .cur{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .chartcard .cur.coral{color:var(--accent)} .chartcard .cur.teal{color:var(--teal)}
+  .chartcard .cur small{font-size:12px;color:var(--ink-3);font-weight:600;letter-spacing:0;margin-left:3px}
+  svg.chart{display:block;width:100%;height:140px;margin-top:8px}
+
+  table.hist{width:100%;border-collapse:collapse;font-size:14px}
+  table.hist th{color:var(--ink-3);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+    text-align:right;padding:9px 6px;border-bottom:1px solid var(--line);font-weight:800}
+  table.hist th:first-child{text-align:left}
+  table.hist td{padding:11px 6px;border-bottom:1px solid var(--line-2);text-align:right;font-weight:600}
+  table.hist tr:last-child td{border-bottom:none}
+  table.hist td:first-child{text-align:left;color:var(--ink-2)}
+
+  /* ---- Plan editor ----------------------------------------------------- */
+  .planbar{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;margin-bottom:14px;-webkit-overflow-scrolling:touch}
+  .planbar::-webkit-scrollbar{display:none}
+  .planchip{flex:none;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink-2);font-weight:700;font-size:14.5px;box-shadow:var(--shadow-sm)}
+  .planchip.on{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 3px 10px rgba(255,84,54,.3)}
+  .planchip.add{color:var(--accent);font-weight:800;border-style:dashed;border-color:var(--accent)}
+
+  .plan-head{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+  .plan-head input{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:13px;
+    color:var(--ink);padding:13px 14px;font-size:18px;font-weight:800;box-shadow:var(--shadow-sm)}
+
+  .plan-ss{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow-sm);
+    padding:12px;margin-bottom:12px}
+  .plan-ss .ss-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+  .plan-ss input.txt,.ex-row input.txt{flex:1;min-width:0;background:var(--line-2);border:1px solid transparent;
+    border-radius:11px;color:var(--ink);padding:12px;font-size:15px;font-weight:600}
+  .plan-ss input.ssname{font-weight:800;background:transparent;font-size:15px;letter-spacing:.02em}
+  .plan-ss input:focus,.plan-head input:focus{outline:none;border-color:var(--accent);background:#fff}
+  .ex-row{display:flex;gap:8px;align-items:center;margin:7px 0}
+  .iconbtn{flex:none;width:44px;height:44px;border:1px solid var(--line);background:#fff;
+    color:var(--ink-3);border-radius:11px;font-size:18px;box-shadow:var(--shadow-sm)}
+  .iconbtn:active{color:var(--accent);border-color:var(--accent)}
+  .addline{background:none;border:1px dashed var(--line);color:var(--ink-2);border-radius:11px;
+    padding:11px;width:100%;font-size:14px;font-weight:600;margin-top:4px}
+  .addline:active{border-color:var(--accent);color:var(--accent)}
+  .addss{background:var(--card);border:1px dashed var(--accent);color:var(--accent);border-radius:14px;
+    padding:15px;width:100%;font-size:15px;font-weight:800;margin-top:4px;box-shadow:var(--shadow-sm)}
+  .delplan{background:none;border:1px solid var(--line);color:var(--ink-3);border-radius:13px;
+    padding:14px;width:100%;font-size:14px;font-weight:700;margin-top:8px}
+  .delplan:active{color:#fff;background:var(--accent);border-color:var(--accent)}
+
+  /* ---- Data tab -------------------------------------------------------- */
+  .bigbtn{width:100%;min-height:var(--tap);border-radius:13px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);font-size:15px;font-weight:700;margin-bottom:10px;
+    box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;gap:8px}
+  .bigbtn.primary{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 3px 10px rgba(255,84,54,.3)}
+  .bigbtn.warn{color:var(--accent)}
+  .note{color:var(--ink-2);font-size:13.5px;line-height:1.6;margin:4px 4px 18px}
+  .note b.mono{color:var(--ink)}
+  .banner{background:var(--teal-tint);color:#0a7d64;border-radius:12px;padding:11px 13px;font-size:13px;
+    font-weight:600;margin-bottom:14px;line-height:1.5}
+  .banner.warn{background:var(--accent-tint);color:var(--accent-press)}
+
+  .empty{color:var(--ink-3);text-align:center;padding:48px 24px;font-size:14.5px;line-height:1.65}
+  .empty b{color:var(--ink-2)}
+
+  /* ---- Bottom nav ------------------------------------------------------ */
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(255,255,255,.94);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);
+    display:flex;padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;background:none;border:none;color:var(--ink-3);padding:9px 0 8px;font-size:10px;
+    letter-spacing:.03em;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:4px}
+  nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round}
+  nav button.on{color:var(--accent)}
+
+  /* ---- Confirm modal (replaces native confirm) ------------------------- */
+  .overlay{position:fixed;inset:0;z-index:50;background:rgba(20,32,43,.4);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+    opacity:0;pointer-events:none;transition:opacity .18s}
+  .overlay.show{opacity:1;pointer-events:auto}
+  .modal{background:#fff;border-radius:20px;max-width:340px;width:100%;padding:22px 20px 16px;
+    box-shadow:0 20px 60px rgba(20,32,43,.3);transform:scale(.96);transition:transform .18s}
+  .overlay.show .modal{transform:scale(1)}
+  .modal h3{margin:0 0 6px;font-size:18px;font-weight:800}
+  .modal p{margin:0 0 18px;color:var(--ink-2);font-size:14.5px;line-height:1.5}
+  .modal .btns{display:flex;gap:10px}
+  .modal button{flex:1;height:48px;border-radius:12px;font-size:15px;font-weight:700;border:1px solid var(--line)}
+  .modal .cancel{background:#fff;color:var(--ink-2)}
+  .modal .go{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .modal .go:active{background:var(--accent-press)}
+
+  /* ---- Install bar (shown when the app is installable) ----------------- */
+  #installbar{display:none;align-items:center;justify-content:space-between;gap:12px;
+    background:var(--accent-tint);color:var(--accent-press);padding:11px 16px;
+    font-size:13.5px;font-weight:700;border-bottom:1px solid #ffd9cf}
+  #installbar .ib-actions{display:flex;align-items:center;gap:6px;flex:none}
+  #installbar button{border:none;border-radius:10px;font-weight:800}
+  #installbar #installGo{background:var(--accent);color:#fff;padding:9px 16px;font-size:13.5px}
+  #installbar #installGo:active{background:var(--accent-press)}
+  #installbar #installNo{background:transparent;color:var(--accent-press);padding:6px 8px;font-size:16px}
+
+  .toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:14px;font-weight:700;
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;white-space:nowrap;box-shadow:var(--shadow)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg class="flame" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3c1.5 3 4.5 4.2 4.5 8a4.5 4.5 0 1 1-9 0c0-1.6.6-2.7 1.4-3.6C9.6 8.6 10 10 11 10.4c-.4-2 .3-5 1-7.4Z"
+            fill="#ff5436"/>
+    </svg>
+    <span class="g">FORGE</span><span class="dot">•</span><span class="l">LOG</span>
+  </div>
+  <div class="mono" style="font-size:13px;color:var(--ink-3);font-weight:600" id="hdrdate"></div>
+</header>
+
+<div id="installbar">
+  <span>Install for a full-screen, offline app</span>
+  <div class="ib-actions">
+    <button id="installGo">Install</button>
+    <button id="installNo" aria-label="Dismiss">✕</button>
+  </div>
+</div>
+
+<main id="view"></main>
+<nav id="nav"></nav>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="mTitle">Are you sure?</h3>
+    <p id="mBody"></p>
+    <div class="btns">
+      <button class="cancel" id="mCancel">Cancel</button>
+      <button class="go" id="mGo">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =======================================================================
+   FORGE·LOG v2 — self-contained workout tracker.
+   No dependencies, no network, no build step. State persists in
+   localStorage; if unavailable (a preview sandbox) it falls back to memory.
+   Destructive actions use an in-app modal, never native confirm() — native
+   dialogs get silently suppressed on Android home-screen apps.
+   ======================================================================= */
+
+const STORE_KEY = "forgelog.v2";
+const OLD_KEY   = "forgelog.v1";
+const WEIGHT_STEP = 5;   // tweak to 2.5, 10, etc.
+const REP_STEP = 1;
+const C_WEIGHT = "#ff5436", C_REPS = "#0fb28f";
+
+/* ---- storage ---------------------------------------------------------- */
+function canStore(){ try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return true; }catch(e){ return false; } }
+const PERSISTENT = canStore();
+let memoryFallback = null;
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function defaultState(){
+  const ss=(name,ex)=>({id:uid(),name,exercises:ex});
+  const plan=(name,sets)=>({id:uid(),name,superSets:sets});
+  return {
+    version:2,
+    plans:[
+      plan("Monday",[
+        ss("Super Set 1",["Barbell Bench Press","Bent-Over Row","Overhead Press"]),
+        ss("Super Set 2",["Incline Dumbbell Press","Lat Pulldown","Lateral Raise"]),
+        ss("Super Set 3",["Cable Fly","Face Pull","Triceps Pushdown"]),
+      ]),
+      plan("Wednesday",[
+        ss("Super Set 1",["Back Squat","Romanian Deadlift","Walking Lunge"]),
+        ss("Super Set 2",["Leg Press","Leg Curl","Leg Extension"]),
+        ss("Super Set 3",["Standing Calf Raise","Hanging Leg Raise","Plank"]),
+      ]),
+      plan("Friday",[
+        ss("Super Set 1",["Deadlift","Pull-Up","Barbell Curl"]),
+        ss("Super Set 2",["Seated Cable Row","Hammer Curl","Rear Delt Fly"]),
+        ss("Super Set 3",["Barbell Shrug","Cable Curl","Wrist Curl"]),
+      ]),
+    ],
+    sessions:[],           // {id,date,planId,planName,sets:[{id,exercise,reps,weight,ts}]}
+    settings:{lastPlanId:null}
+  };
+}
+
+function migrateV1(old){
+  // Convert old {templates:{Mon..},sessions:[{date,day,sets}]} to v2.
+  try{
+    const nameToId={};
+    const plans=Object.keys(old.templates).map(day=>{
+      const id=uid(); nameToId[day]=id;
+      return {id,name:day,superSets:old.templates[day].map(ss=>({id:uid(),name:ss.name,exercises:ss.exercises.slice()}))};
+    });
+    const sessions=(old.sessions||[]).map(s=>({
+      id:s.id||uid(),date:s.date,planId:nameToId[s.day]||null,planName:s.day,sets:s.sets||[]
+    }));
+    return {version:2,plans,sessions,settings:{lastPlanId:null}};
+  }catch(e){ return null; }
+}
+
+function load(){
+  if(!PERSISTENT) return memoryFallback || (memoryFallback=defaultState());
+  try{
+    const raw=localStorage.getItem(STORE_KEY);
+    if(raw){ const s=JSON.parse(raw); if(s.plans&&s.sessions) return normalize(s); }
+    const old=localStorage.getItem(OLD_KEY);
+    if(old){ const m=migrateV1(JSON.parse(old)); if(m){ return m; } }
+  }catch(e){}
+  return defaultState();
+}
+function normalize(s){ if(!s.settings) s.settings={lastPlanId:null}; return s; }
+function save(){
+  if(!PERSISTENT){ memoryFallback=state; return; }
+  try{ localStorage.setItem(STORE_KEY,JSON.stringify(state)); }
+  catch(e){ toast("Couldn't save — storage full?"); }
+}
+
+let state=load();
+
+/* ---- date helpers ----------------------------------------------------- */
+function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fmtDateShort(iso){ const [y,m,d]=iso.split("-"); return +m+"/"+ +d; }
+function fmtDateLong(iso){ const [y,m,d]=iso.split("-"); const dt=new Date(+y,+m-1,+d);
+  return dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }
+function fmtWeight(w){ return w%1===0? String(w) : w.toFixed(1); }
+function fmtNum(n){ return n.toLocaleString(); }
+
+/* ---- ui state --------------------------------------------------------- */
+let ui={
+  tab:"log",
+  date:todayISO(),
+  planId:(state.settings.lastPlanId && state.plans.some(p=>p.id===state.settings.lastPlanId))
+          ? state.settings.lastPlanId : (state.plans[0]? state.plans[0].id : null),
+  editPlanId:(state.plans[0]? state.plans[0].id : null),
+  histExercise:null,
+};
+
+/* ---- lookups ---------------------------------------------------------- */
+function planById(id){ return state.plans.find(p=>p.id===id) || null; }
+function currentSession(create){
+  let s=state.sessions.find(x=>x.date===ui.date && x.planId===ui.planId);
+  if(!s && create){
+    const p=planById(ui.planId);
+    s={id:uid(),date:ui.date,planId:ui.planId,planName:p?p.name:"",sets:[]};
+    state.sessions.push(s); save();
+  }
+  return s;
+}
+function setsFor(exercise){
+  const s=state.sessions.find(x=>x.date===ui.date && x.planId===ui.planId);
+  return s ? s.sets.filter(t=>t.exercise===exercise) : [];
+}
+function lastEntry(exercise){
+  let best=null;
+  for(const s of state.sessions) for(const t of s.sets)
+    if(t.exercise===exercise && (!best||t.ts>best.ts)) best=t;
+  return best;
+}
+function allExercises(){
+  const set=new Set();
+  for(const p of state.plans) for(const ss of p.superSets) for(const e of ss.exercises) if(e.trim()) set.add(e);
+  for(const s of state.sessions) for(const t of s.sets) set.add(t.exercise);
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+
+/* ---- toast + modal ---------------------------------------------------- */
+let toastTimer=null;
+function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg;
+  el.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),1600); }
+
+const overlay=document.getElementById("overlay");
+let modalYes=null;
+function confirmModal(title,body,confirmLabel,onYes){
+  document.getElementById("mTitle").textContent=title;
+  document.getElementById("mBody").textContent=body;
+  document.getElementById("mGo").textContent=confirmLabel||"Delete";
+  modalYes=onYes; overlay.classList.add("show");
+}
+function closeModal(){ overlay.classList.remove("show"); modalYes=null; }
+document.getElementById("mCancel").onclick=closeModal;
+document.getElementById("mGo").onclick=()=>{ const f=modalYes; closeModal(); if(f) f(); };
+overlay.addEventListener("click",e=>{ if(e.target===overlay) closeModal(); });
+
+/* ======================================================================
+   RENDER
+   ====================================================================== */
+const view=document.getElementById("view");
+document.getElementById("hdrdate").textContent=fmtDateLong(todayISO());
+
+function render(){
+  if(ui.tab==="log") renderLog();
+  else if(ui.tab==="history") renderHistory();
+  else if(ui.tab==="plan") renderPlan();
+  else renderData();
+  renderNav();
+}
+
+/* ---- LOG -------------------------------------------------------------- */
+function renderLog(){
+  if(!state.plans.length){
+    view.innerHTML=`<div class="empty">No workout plans yet.<br>Head to <b>Plan</b> to create one, then come back to log.</div>`;
+    return;
+  }
+  if(!ui.planId || !planById(ui.planId)) ui.planId=state.plans[0].id;
+
+  let html=`
+    <div class="setup">
+      <div class="fld">
+        <label>Date</label>
+        <input type="date" id="dateIn" value="${ui.date}">
+      </div>
+      <div class="fld">
+        <label>Plan</label>
+        <select id="planIn">
+          ${state.plans.map(p=>`<option value="${p.id}" ${p.id===ui.planId?'selected':''}>${esc(p.name)}</option>`).join("")}
+        </select>
+      </div>
+    </div>`;
+
+  const sess=state.sessions.find(x=>x.date===ui.date && x.planId===ui.planId);
+  const setList=sess?sess.sets:[];
+  const totalSets=setList.length;
+  const exCount=new Set(setList.map(t=>t.exercise)).size;
+  const volume=setList.reduce((n,t)=>n+t.weight*t.reps,0);
+  html+=`
+    <div class="stats">
+      <div class="stat"><div class="v coral mono">${totalSets}</div><div class="k">Sets</div></div>
+      <div class="stat"><div class="v mono">${exCount}</div><div class="k">Exercises</div></div>
+      <div class="stat"><div class="v teal mono">${fmtNum(volume)}</div><div class="k">Volume</div></div>
+    </div>`;
+
+  const plan=planById(ui.planId);
+  plan.superSets.forEach(ss=>{
+    const exs=ss.exercises.filter(e=>e.trim());
+    if(!exs.length) return;
+    html+=`<div class="ss-title"><span class="bar"></span><span>${esc(ss.name)}</span></div>`;
+    exs.forEach(ex=>{
+      const done=setsFor(ex), last=lastEntry(ex);
+      const preRep=last?last.reps:9, preWt=last?last.weight:45;
+      html+=`
+      <div class="card" data-ex="${esc(ex)}">
+        <div class="ex-head">
+          <div>
+            <div class="ex-name">${esc(ex)}</div>
+            <div class="ex-last">${last?`Last: <b class="mono">${fmtWeight(last.weight)}</b> × <b class="mono">${last.reps}</b>`:"No history yet"}</div>
+          </div>
+          <div class="count"><div class="n mono">${done.length}</div><div class="l">sets</div></div>
+        </div>
+        <div class="entry">
+          <div class="fields">
+            <div class="field"><span class="lab">Reps</span>
+              <div class="stepper">
+                <button data-act="rep-">–</button>
+                <input class="mono" type="number" inputmode="numeric" data-in="reps" value="${preRep}">
+                <button data-act="rep+">+</button>
+              </div>
+            </div>
+            <div class="field"><span class="lab">Weight</span>
+              <div class="stepper">
+                <button data-act="wt-">–</button>
+                <input class="mono" type="number" inputmode="decimal" data-in="weight" value="${fmtWeight(preWt)}">
+                <button data-act="wt+">+</button>
+              </div>
+            </div>
+          </div>
+          <button class="logbtn" data-act="log">Log</button>
+        </div>
+        <div class="sets">
+          ${done.map(t=>`<span class="chip" data-set="${t.id}"><span class="mono"><b>${fmtWeight(t.weight)}</b> <span class="r">× ${t.reps}</span></span><span class="x" data-act="delset">×</span></span>`).join("")}
+        </div>
+      </div>`;
+    });
+  });
+  view.innerHTML=html;
+
+  // date + plan controls
+  document.getElementById("dateIn").onchange=e=>{ ui.date=e.target.value||todayISO(); renderLog(); };
+  document.getElementById("planIn").onchange=e=>{
+    ui.planId=e.target.value; state.settings.lastPlanId=ui.planId; save(); renderLog();
+  };
+
+  view.querySelectorAll(".card").forEach(card=>{
+    const ex=card.dataset.ex;
+    const repIn=card.querySelector('[data-in="reps"]');
+    const wtIn =card.querySelector('[data-in="weight"]');
+    card.querySelectorAll(".stepper button, .logbtn").forEach(btn=>{
+      btn.onclick=()=>{
+        const a=btn.dataset.act;
+        if(a==="rep+") repIn.value=Math.max(0,(+repIn.value||0)+REP_STEP);
+        else if(a==="rep-") repIn.value=Math.max(0,(+repIn.value||0)-REP_STEP);
+        else if(a==="wt+") wtIn.value=fmtWeight(Math.max(0,(+wtIn.value||0)+WEIGHT_STEP));
+        else if(a==="wt-") wtIn.value=fmtWeight(Math.max(0,(+wtIn.value||0)-WEIGHT_STEP));
+        else if(a==="log"){
+          const reps=+repIn.value||0, weight=+wtIn.value||0;
+          const sess=currentSession(true);
+          sess.sets.push({id:uid(),exercise:ex,reps,weight,ts:Date.now()});
+          save(); toast(`Logged ${fmtWeight(weight)} × ${reps}`); renderLog();
+        }
+      };
+    });
+    card.querySelectorAll(".chip .x").forEach(x=>{
+      x.onclick=()=>{ const id=x.closest(".chip").dataset.set; const sess=currentSession(false);
+        if(sess){ sess.sets=sess.sets.filter(t=>t.id!==id); save(); renderLog(); } };
+    });
+  });
+}
+
+/* ---- HISTORY ---------------------------------------------------------- */
+function renderHistory(){
+  const exs=allExercises();
+  let html=`<h2 class="screen">History</h2>`;
+  if(!exs.length){ view.innerHTML=html+`<div class="empty">Nothing logged yet.<br>Your weight & rep trends appear here once you log a few sets.</div>`; return; }
+  if(!ui.histExercise || !exs.includes(ui.histExercise)) ui.histExercise=exs[0];
+
+  html+=`<select class="picker" id="expick">${exs.map(e=>`<option ${e===ui.histExercise?'selected':''}>${esc(e)}</option>`).join("")}</select>`;
+
+  const rows=[];
+  for(const s of state.sessions){
+    const mine=s.sets.filter(t=>t.exercise===ui.histExercise);
+    if(!mine.length) continue;
+    const finishing=mine[mine.length-1];
+    const top=mine.reduce((m,t)=>t.weight>m.weight?t:m,mine[0]);
+    rows.push({date:s.date,sets:mine.length,finW:finishing.weight,finR:finishing.reps,topW:top.weight,topR:top.reps});
+  }
+  rows.sort((a,b)=>a.date<b.date?-1:1);
+  if(!rows.length){ view.innerHTML=html+`<div class="empty">No sessions logged for this exercise yet.</div>`; wirePick(exs); return; }
+
+  const wPts=rows.map((r,i)=>({x:i,label:fmtDateShort(r.date),value:r.finW}));
+  const rPts=rows.map((r,i)=>({x:i,label:fmtDateShort(r.date),value:r.finR}));
+  const cur=rows[rows.length-1];
+  html+=`
+    <div class="chartcard">
+      <div class="row"><h4>Finishing weight</h4><div class="cur coral mono">${fmtWeight(cur.finW)}<small>latest</small></div></div>
+      ${lineChart(wPts,C_WEIGHT)}
+    </div>
+    <div class="chartcard">
+      <div class="row"><h4>Finishing reps</h4><div class="cur teal mono">${cur.finR}<small>latest</small></div></div>
+      ${lineChart(rPts,C_REPS)}
+    </div>
+    <div class="chartcard">
+      <h4 style="margin-bottom:6px">Session log</h4>
+      <table class="hist">
+        <tr><th>Date</th><th>Sets</th><th>Finish</th><th>Top</th></tr>
+        ${rows.slice().reverse().map(r=>`<tr>
+          <td>${fmtDateShort(r.date)}</td><td class="mono">${r.sets}</td>
+          <td class="mono">${fmtWeight(r.finW)}×${r.finR}</td><td class="mono">${fmtWeight(r.topW)}×${r.topR}</td></tr>`).join("")}
+      </table>
+    </div>`;
+  view.innerHTML=html; wirePick(exs);
+}
+function wirePick(exs){ const s=document.getElementById("expick"); if(s) s.onchange=()=>{ ui.histExercise=s.value; renderHistory(); }; }
+
+/* dependency-free SVG line chart with soft area fill (light theme) */
+function lineChart(pts,color){
+  const W=600,H=140,pad=12,padB=24,padT=16;
+  if(pts.length===1) pts=[{...pts[0],x:0},{...pts[0],x:1}];
+  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.value);
+  const minX=Math.min(...xs),maxX=Math.max(...xs);
+  let minY=Math.min(...ys),maxY=Math.max(...ys);
+  if(minY===maxY){ minY-=1; maxY+=1; }
+  const sx=x=> pad+(maxX===minX?0:(x-minX)/(maxX-minX))*(W-2*pad);
+  const sy=y=> (H-padB)-(y-minY)/(maxY-minY)*(H-padB-padT);
+  const line=pts.map((p,i)=>(i?"L":"M")+sx(p.x).toFixed(1)+" "+sy(p.value).toFixed(1)).join(" ");
+  const area=line+` L ${sx(pts[pts.length-1].x).toFixed(1)} ${H-padB} L ${sx(pts[0].x).toFixed(1)} ${H-padB} Z`;
+  const dots=pts.map(p=>`<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.value).toFixed(1)}" r="3.4" fill="#fff" stroke="${color}" stroke-width="2.4"/>`).join("");
+  const gy=(H-padB); 
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <line x1="${pad}" y1="${gy}" x2="${W-pad}" y2="${gy}" stroke="#e5eaef" stroke-width="1"/>
+    <path d="${area}" fill="${color}" fill-opacity="0.10"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    <text x="${pad}" y="${H-7}" fill="#93a1ac" font-size="11" font-weight="600">${pts[0].label}</text>
+    <text x="${W-pad}" y="${H-7}" fill="#93a1ac" font-size="11" font-weight="600" text-anchor="end">${pts[pts.length-1].label}</text>
+    <text x="${W-pad}" y="13" fill="#93a1ac" font-size="11" font-weight="600" text-anchor="end">${fmtWeight(maxY)}</text>
+  </svg>`;
+}
+
+/* ---- PLAN ------------------------------------------------------------- */
+function renderPlan(){
+  let html=`<h2 class="screen">Plans</h2>`;
+  html+=`<div class="planbar">`+
+    state.plans.map(p=>`<button class="planchip ${p.id===ui.editPlanId?'on':''}" data-plan="${p.id}">${esc(p.name)}</button>`).join("")+
+    `<button class="planchip add" data-act="newplan">+ New</button></div>`;
+
+  if(!state.plans.length){
+    view.innerHTML=html+`<div class="empty">Create your first plan to start building super sets.</div>`;
+    wirePlanBar(); return;
+  }
+  if(!ui.editPlanId || !planById(ui.editPlanId)) ui.editPlanId=state.plans[0].id;
+  const plan=planById(ui.editPlanId);
+
+  html+=`<div class="plan-head"><input id="planName" value="${esc(plan.name)}" placeholder="Plan name"></div>`;
+
+  plan.superSets.forEach((ss,si)=>{
+    html+=`<div class="plan-ss" data-si="${si}">
+      <div class="ss-row">
+        <input class="txt ssname" data-fld="ssname" value="${esc(ss.name)}" placeholder="Super set name">
+        <button class="iconbtn" data-act="delss" title="Remove super set">🗑</button>
+      </div>`;
+    ss.exercises.forEach((ex,ei)=>{
+      html+=`<div class="ex-row" data-ei="${ei}">
+        <input class="txt" data-fld="exname" value="${esc(ex)}" placeholder="Exercise">
+        <button class="iconbtn" data-act="delex">×</button></div>`;
+    });
+    html+=`<button class="addline" data-act="addex">+ Add exercise</button></div>`;
+  });
+  html+=`<button class="addss" data-act="addss">+ Add super set</button>`;
+  html+=`<button class="delplan" data-act="delplan">Delete “${esc(plan.name)}” plan</button>`;
+  view.innerHTML=html;
+
+  wirePlanBar();
+
+  document.getElementById("planName").onchange=e=>{ plan.name=e.target.value.trim()||plan.name; save(); renderPlan(); };
+
+  view.querySelectorAll('[data-fld="ssname"]').forEach(inp=>{
+    const si=+inp.closest(".plan-ss").dataset.si;
+    inp.onchange=()=>{ plan.superSets[si].name=inp.value.trim()||"Super set"; save(); };
+  });
+  view.querySelectorAll('[data-fld="exname"]').forEach(inp=>{
+    const si=+inp.closest(".plan-ss").dataset.si, ei=+inp.closest(".ex-row").dataset.ei;
+    inp.onchange=()=>{ plan.superSets[si].exercises[ei]=inp.value.trim(); save(); };
+  });
+
+  view.querySelectorAll("button[data-act]").forEach(btn=>{
+    if(btn.closest(".planbar")) return; // plan bar is wired by wirePlanBar()
+    btn.onclick=()=>{
+      const a=btn.dataset.act;
+      const ssEl=btn.closest(".plan-ss"); const si=ssEl?+ssEl.dataset.si:null;
+      if(a==="addss"){ plan.superSets.push({id:uid(),name:"Super Set "+(plan.superSets.length+1),exercises:[""]}); save(); renderPlan(); }
+      else if(a==="addex"){ plan.superSets[si].exercises.push(""); save(); renderPlan(); }
+      else if(a==="delex"){ const ei=+btn.closest(".ex-row").dataset.ei; plan.superSets[si].exercises.splice(ei,1); save(); renderPlan(); }
+      else if(a==="delss"){
+        confirmModal("Remove super set", `Delete “${plan.superSets[si].name}” and its exercises from this plan?`, "Remove",
+          ()=>{ plan.superSets.splice(si,1); save(); renderPlan(); });
+      }
+      else if(a==="delplan"){
+        confirmModal("Delete plan", `Delete the “${plan.name}” plan? Logged sessions stay in your history.`, "Delete plan",
+          ()=>{ state.plans=state.plans.filter(p=>p.id!==plan.id);
+                ui.editPlanId=state.plans[0]?state.plans[0].id:null;
+                if(ui.planId===plan.id) ui.planId=ui.editPlanId;
+                save(); renderPlan(); });
+      }
+    };
+  });
+}
+function wirePlanBar(){
+  view.querySelectorAll(".planbar .planchip").forEach(b=>{
+    if(b.dataset.act==="newplan"){
+      b.onclick=()=>{ const p={id:uid(),name:"New Plan",superSets:[{id:uid(),name:"Super Set 1",exercises:[""]}]};
+        state.plans.push(p); ui.editPlanId=p.id; save(); renderPlan(); };
+    } else {
+      b.onclick=()=>{ ui.editPlanId=b.dataset.plan; renderPlan(); };
+    }
+  });
+}
+
+/* ---- DATA ------------------------------------------------------------- */
+function renderData(){
+  const nSets=state.sessions.reduce((n,s)=>n+s.sets.length,0);
+  view.innerHTML=`
+    <h2 class="screen">Data</h2>
+    <div class="banner ${PERSISTENT?'':'warn'}">${PERSISTENT
+      ? "Saved on this device. Export a backup now and then so clearing your browser can't erase your history."
+      : "⚠ Persistent storage isn't available in this preview — data resets when you leave. On your phone it saves automatically."}</div>
+    <p class="note"><b class="mono">${state.plans.length}</b> plans · <b class="mono">${state.sessions.length}</b> sessions · <b class="mono">${nSets}</b> sets logged.</p>
+    <button class="bigbtn primary" id="export">Export backup (.json)</button>
+    <button class="bigbtn" id="import">Restore from backup</button>
+    <input type="file" id="file" accept="application/json,.json" style="display:none">
+    <button class="bigbtn warn" id="wipe">Erase all data</button>
+    <p class="note">Restore replaces everything currently in the app with the backup file's contents.</p>`;
+
+  document.getElementById("export").onclick=()=>{
+    const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="forgelog-backup-"+todayISO()+".json"; a.click(); URL.revokeObjectURL(a.href); toast("Backup exported");
+  };
+  const file=document.getElementById("file");
+  document.getElementById("import").onclick=()=>file.click();
+  file.onchange=()=>{ const f=file.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=()=>{ try{ const s=JSON.parse(r.result);
+      if(!s.plans||!s.sessions) throw 0; state=normalize(s);
+      ui.planId=state.plans[0]?state.plans[0].id:null; ui.editPlanId=ui.planId;
+      save(); toast("Backup restored"); render();
+    }catch(e){ toast("That file isn't a valid backup"); } };
+    r.readAsText(f); };
+  document.getElementById("wipe").onclick=()=>{
+    confirmModal("Erase everything", "Delete all plans and history? This can't be undone.", "Erase all",
+      ()=>{ state=defaultState(); ui.planId=state.plans[0].id; ui.editPlanId=ui.planId; save(); toast("Reset"); render(); });
+  };
+}
+
+/* ---- NAV -------------------------------------------------------------- */
+function renderNav(){
+  const items=[
+    ["log","Log",'<path d="M4 6h16M4 12h16M4 18h11"/><circle cx="19.5" cy="18" r="1.6" fill="currentColor" stroke="none"/>'],
+    ["history","Trends",'<path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-5 3 3 5-7"/>'],
+    ["plan","Plan",'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h4"/>'],
+    ["data","Data",'<path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 20h14"/>'],
+  ];
+  document.getElementById("nav").innerHTML=items.map(([id,label,svg])=>
+    `<button data-tab="${id}" class="${ui.tab===id?'on':''}"><svg viewBox="0 0 24 24">${svg}</svg>${label}</button>`).join("");
+  document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{ ui.tab=b.dataset.tab; window.scrollTo(0,0); render(); });
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+render();
+</script>
+<script>
+/* ---- Install to home screen (real standalone app) --------------------- */
+(function(){
+  let deferredPrompt=null;
+  const bar=document.getElementById("installbar");
+  const standalone=()=> (window.matchMedia&&matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault(); deferredPrompt=e;
+    if(!standalone()) bar.style.display="flex";   // Chrome says it's installable
+  });
+  window.addEventListener("appinstalled",()=>{ deferredPrompt=null; bar.style.display="none"; });
+  document.getElementById("installGo").onclick=async()=>{
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    try{ await deferredPrompt.userChoice; }catch(e){}
+    deferredPrompt=null; bar.style.display="none";
+  };
+  document.getElementById("installNo").onclick=()=>{ bar.style.display="none"; };
+})();
+
+/* Register the service worker so the app installs and works offline.
+   Only runs when served over https (skipped for local file:// opening). */
+if("serviceWorker" in navigator && location.protocol==="https:"){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
